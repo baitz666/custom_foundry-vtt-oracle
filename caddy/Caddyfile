@@ -30,4 +30,3 @@ YOUR_DOMAIN {
 	# Reverse proxy to Foundry on localhost
 	reverse_proxy 127.0.0.1:30000
 }
-# EOF
