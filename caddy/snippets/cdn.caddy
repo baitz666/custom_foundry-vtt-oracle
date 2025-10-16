@@ -1,0 +1,10 @@
+# Redirect heavy static paths to your CDN (S3/R2/B2 behind cdn.*)
+# 1) Point cdn.YOUR_DOMAIN at your S3-compatible bucket (or a Cloudflare R2 custom domain)
+# 2) Upload your assets keeping the same path structure (/assets, /modules, /systems, /worlds, /fonts)
+
+@big path /assets/* /modules/* /systems/* /worlds/* /fonts/*
+# TEMP TEST: 302 redirect; switch to 301 when you’re happy
+redir @big https://cdn.YOUR_DOMAIN{uri} 302
+
+# Optional CORS for fonts/images (adjust as needed)
+header @big Access-Control-Allow-Origin "*"
