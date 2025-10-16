@@ -64,14 +64,16 @@ read -r DOMAIN
 # Fetch main Caddyfile from GitHub
 curl -fsSL "$REPO_RAW/caddy/Caddyfile" -o /tmp/Caddyfile
 # (Optional) fetch CDN snippet but don't import it yet
-# curl -fsSL "$REPO_RAW/caddy/snippets/cdn.caddy" -o /etc/caddy/snippets/cdn.caddy
+sudo mkdir -p /etc/caddy/snippets
+curl -fsSL "$REPO_RAW/caddy/snippets/cdn.caddy" -o /etc/caddy/snippets/cdn.caddy
 
 # Replace placeholder with your domain (keep a clear token in the file, e.g. YOUR_DOMAIN)
 sudo sed "s/YOUR_DOMAIN/${DOMAIN}/g" /tmp/Caddyfile | sudo tee /etc/caddy/Caddyfile >/dev/null
-sudo systemctl enable --now caddy
-
+# Format Caddyfile
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
 # Validate & reload Caddy
 sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl enable --now caddy
 sudo systemctl reload caddy || sudo systemctl restart caddy
 
 # ==== Tell Foundry it’s behind HTTPS (wait until options.json exists) ====
@@ -81,16 +83,30 @@ for i in {1..30}; do
   [[ -f "$OPTS" ]] && break
   sleep 2
 done
+
 if [[ -f "$OPTS" ]]; then
-  sed -i 's/"proxyPort": null/"proxyPort": 443/g' "$OPTS"
-  sed -i 's/"proxySSL": false/"proxySSL": true/g' "$OPTS"
-  # Optional: lock hostname into Foundry (helps invites/absolute URLs)
-  # jq -r --arg h "$DOMAIN" '.hostname=$h' "$OPTS" > "$OPTS.tmp" && mv "$OPTS.tmp" "$OPTS"
+  # 1) Try quick sed replacements (tolerate no-op matches; whitespace-flexible)
+  sed -i \
+    -e 's/"proxyPort"[[:space:]]*:[[:space:]]*null/"proxyPort": 443/' \
+    -e 's/"proxySSL"[[:space:]]*:[[:space:]]*false/"proxySSL": true/' \
+    "$OPTS" || true
+
+  # 2) Verify the fields actually ended up correct; if not, fall back to jq
+  if ! grep -Eq '"proxyPort"[[:space:]]*:[[:space:]]*443' "$OPTS" \
+     || ! grep -Eq '"proxySSL"[[:space:]]*:[[:space:]]*true' "$OPTS"; then
+    echo "sed did not apply cleanly; installing jq and writing values structurally…"
+    sudo apt -y install jq
+    TMP="$(mktemp)"
+    jq '.proxyPort=443 | .proxySSL=true' "$OPTS" > "$TMP" \
+      && sudo mv "$TMP" "$OPTS"
+  fi
+
   pm2 restart foundry
 else
-  echo "WARNING: $OPTS not found yet. Start Foundry once and re-run the two sed lines."
+  echo "WARNING: $OPTS not found yet. Start Foundry once and re-run the proxy settings."
 fi
-
+# ==== Final notes ====
+echo "===================================================="
 echo "Done. Give Caddy ~30-60s to issue the cert, then open: https://${DOMAIN}"
 echo "TIP: Once HTTPS works, close public port 30000 in OCI; keep only 22,80,443."
 echo "Restarting system to complete installation"
