@@ -90,7 +90,7 @@ else
   echo "WARNING: $OPTS not found yet. Start Foundry once and re-run the two sed lines."
 fi
 
-echo "Done. Give Caddy ~30–60s to issue the cert, then open: https://${DOMAIN}"
+echo "Done. Give Caddy ~30-60s to issue the cert, then open: https://${DOMAIN}"
 echo "TIP: Once HTTPS works, close public port 30000 in OCI; keep only 22,80,443."
 echo "Restarting system to complete installation"
 sleep 60
