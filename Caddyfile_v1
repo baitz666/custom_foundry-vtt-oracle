@@ -1,0 +1,9 @@
+# This replaces the existing content in /etc/caddy/Caddyfile
+# A CONFIG SECTION FOR YOUR HOSTNAME
+{
+  email admin@${DOMAIN}
+}
+${DOMAIN} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:30000
+}

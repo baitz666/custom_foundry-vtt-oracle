@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==== Basics ====
+sudo apt update && sudo apt -y upgrade
+sudo apt -y install ca-certificates curl gnupg unzip nano
+
+# ==== Node 22 LTS + PM2 (per current Foundry recommendation) ====
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+  | sudo tee /etc/apt/sources.list.d/nodesource.list
+sudo apt update && sudo apt -y install nodejs
+sudo npm i -g pm2
+pm2 update
+pm2 startup
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
+
+# ==== Folders ====
+mkdir -p ~/foundry ~/foundryuserdata
+
+# ==== Download Foundry (Node build) ====
+echo "Paste the Foundry timed NodeJS download URL:"
+read -r TDURL
+wget -O ~/foundry/foundryvtt.zip "$TDURL"
+unzip -o ~/foundry/foundryvtt.zip -d ~/foundry
+rm -f  ~/foundry/foundryvtt.zip
+
+# ==== Locate the proper entrypoint (flat vs nested layout) ====
+if [[ -f "$HOME/foundry/resources/app/main.js" ]]; then
+  ENTRY="$HOME/foundry/resources/app/main.js"
+elif [[ -f "$HOME/foundry/main.js" ]]; then
+  ENTRY="$HOME/foundry/main.js"
+else
+  # Fallback: search but ignore node_modules
+  ENTRY="$(find "$HOME/foundry" -type f -name 'main.js' ! -path '*node_modules*' | head -n1)"
+fi
+if [[ -z "${ENTRY:-}" || ! -f "$ENTRY" ]]; then
+  echo "ERROR: Could not find Foundry entrypoint (main.js)."
+  exit 1
+fi
+# ENTRY now points to Foundry's main.js
+
+# ==== First PM2 run (bind to localhost only) ====
+pm2 start "node $ENTRY --dataPath=/home/ubuntu/foundryuserdata --port=30000 --hostname=127.0.0.1" --name foundry
+pm2 save
+
+# (Optional) Small priority boost
+sudo renice -n -5 -p "$(pgrep -f "$ENTRY" | head -1)" || true
+
+# ==== Caddy (reverse proxy with auto-HTTPS) ====
+sudo apt -y install debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt -y install caddy
+
+echo "Enter the public hostname players will use (e.g., mythos-vtt.ddns.net):"
+read -r DOMAIN
+
+# Minimal, solid Caddyfile (add cache headers below if desired)
+sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
+{
+  email admin@${DOMAIN}
+}
+${DOMAIN} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:30000
+}
+EOF
+sudo systemctl reload caddy || sudo systemctl restart caddy
+
+# ==== Tell Foundry it’s behind HTTPS (wait until options.json exists) ====
+OPTS=/home/ubuntu/foundryuserdata/Config/options.json
+echo "Waiting for $OPTS to be created by Foundry (first run)..."
+for i in {1..30}; do
+  [[ -f "$OPTS" ]] && break
+  sleep 2
+done
+if [[ -f "$OPTS" ]]; then
+  sed -i 's/"proxyPort": null/"proxyPort": 443/g' "$OPTS"
+  sed -i 's/"proxySSL": false/"proxySSL": true/g' "$OPTS"
+  # Optional: lock hostname (uncomment next two lines after: sudo apt -y install jq)
+  # sudo apt -y install jq
+  # tmp=$(mktemp) && jq --arg h "$DOMAIN" '.hostname=$h' "$OPTS" > "$tmp" && sudo mv "$tmp" "$OPTS"
+  pm2 restart foundry
+else
+  echo "WARNING: $OPTS not found yet. Start Foundry once and re-run the sed lines."
+fi
+
+echo "Done. Give Caddy ~30–60s to issue the cert, then open: https://${DOMAIN}"
+echo "TIP: Once HTTPS works, close public port 30000 in OCI; keep only 22,80,443."

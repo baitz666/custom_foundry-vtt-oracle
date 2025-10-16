@@ -1,0 +1,22 @@
+# This replaces the existing content in /etc/caddy/Caddyfile
+# A CONFIG SECTION FOR YOUR HOSTNAME
+{
+  email admin@${DOMAIN}
+}
+${DOMAIN} {
+  encode zstd gzip
+
+	# Cache static assets aggressively
+	header /assets/* /modules/* /systems/* /worlds/* /fonts/* {
+		Cache-Control "public, max-age=604800, immutable"
+	}
+
+	# Light hardening
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "no-referrer-when-downgrade"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+	}
+
+	reverse_proxy localhost:30000
+}
