@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-REPO_RAW="https://raw.githubusercontent.com/<YOUR_GH_USER>/mythos-foundry-oracle/main"
+REPO_RAW="https://raw.githubusercontent.com/baitz666/foundryOracle/main"
 
 # ==== Basics: update system, remove older packages; install gnupg, unzip, nano ====
 sudo apt update && sudo apt -y upgrade && sudo apt autoremove -y && sudo apt autoclean
