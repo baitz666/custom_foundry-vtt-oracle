@@ -1,12 +1,15 @@
 # This replaces the existing content in /etc/caddy/Caddyfile
 # A CONFIG SECTION FOR YOUR HOSTNAME
 {
-  email admin@${DOMAIN}
+	# You can set your email here (for ACME) or leave it empty
+	email admin@${DOMAIN}
 }
-${DOMAIN} {
-  encode zstd gzip
 
-	# Cache static assets aggressively
+${DOMAIN} {
+	# HTTP/2 + compression
+	encode zstd gzip
+
+	# Long cache for static assets (safe for hashed / versioned paths)
 	header /assets/* /modules/* /systems/* /worlds/* /fonts/* {
 		Cache-Control "public, max-age=604800, immutable"
 	}
@@ -18,5 +21,9 @@ ${DOMAIN} {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 	}
 
-	reverse_proxy localhost:30000
+	# (Optional, keep commented until you want CDN)
+	# import /etc/caddy/snippets/cdn.caddy
+
+	# Reverse proxy to Foundry on localhost
+	reverse_proxy 127.0.0.1:30000
 }

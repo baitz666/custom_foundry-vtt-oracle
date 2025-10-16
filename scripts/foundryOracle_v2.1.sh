@@ -61,29 +61,16 @@ sudo apt update && sudo apt -y install caddy
 echo "Enter the public hostname players will use (e.g., mythos-vtt.ddns.net):"
 read -r DOMAIN
 
-# Minimal, solid Caddyfile
-sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
-{
-  email admin@${DOMAIN}
-}
-${DOMAIN} {
-  encode zstd gzip
+# Fetch main Caddyfile from GitHub
+curl -fsSL "$REPO_RAW/caddy/Caddyfile" -o /tmp/Caddyfile
+# (Optional) fetch CDN snippet but don't import it yet
+# curl -fsSL "$REPO_RAW/caddy/snippets/cdn.caddy" -o /etc/caddy/snippets/cdn.caddy
 
-	# Cache static assets aggressively
-	header /assets/* /modules/* /systems/* /worlds/* /fonts/* {
-		Cache-Control "public, max-age=604800, immutable"
-	}
+# Replace placeholder with your domain (keep a clear token in the file, e.g. YOUR_DOMAIN)
+sudo sed "s/YOUR_DOMAIN/${DOMAIN}/g" /tmp/Caddyfile | sudo tee /etc/caddy/Caddyfile >/dev/null
 
-	# Light hardening
-	header {
-		X-Frame-Options "SAMEORIGIN"
-		Referrer-Policy "no-referrer-when-downgrade"
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-	}
-
-	reverse_proxy localhost:30000
-}
-EOF
+# Validate & reload Caddy
+sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl reload caddy || sudo systemctl restart caddy
 
 # ==== Tell Foundry it’s behind HTTPS (wait until options.json exists) ====
