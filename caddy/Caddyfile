@@ -1,7 +1,6 @@
+# /etc/caddy/Caddyfile
 # This replaces the existing content in /etc/caddy/Caddyfile
 # A CONFIG SECTION FOR YOUR HOSTNAME
-# /etc/caddy/Caddyfile
-
 {
 	# Optional: ACME email (either keep this with YOUR_DOMAIN, or remove it)
 	email admin@YOUR_DOMAIN
