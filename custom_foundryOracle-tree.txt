@@ -1,0 +1,12 @@
+.
+├── caddy
+│  ├── Caddyfile_v0
+│  ├── Caddyfile_v1
+│  ├── Caddyfile_v1.1
+│  └── snippets
+│     └── cdn.caddy
+├── custom_foundryOracle-tree.txt
+├── README.md
+└── scripts
+   ├── foundryOracle_v2.0.sh
+   └── foundryOracle_v2.1.sh

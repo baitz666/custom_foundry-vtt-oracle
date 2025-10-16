@@ -29,6 +29,7 @@ unzip -o ~/foundry/foundryvtt.zip -d ~/foundry
 rm -f  ~/foundry/foundryvtt.zip
 
 # ==== Locate the proper entrypoint (flat vs nested layout) ====
+# ENTRY should now point to Foundry's main.js
 if [[ -f "$HOME/foundry/resources/app/main.js" ]]; then
   ENTRY="$HOME/foundry/resources/app/main.js"
 elif [[ -f "$HOME/foundry/main.js" ]]; then
@@ -41,7 +42,6 @@ if [[ -z "${ENTRY:-}" || ! -f "$ENTRY" ]]; then
   echo "ERROR: Could not find Foundry entrypoint (main.js)."
   exit 1
 fi
-# ENTRY now points to Foundry's main.js
 
 # ==== First PM2 run (bind to localhost only) ====
 pm2 start "node $ENTRY --dataPath=/home/ubuntu/foundryuserdata --port=30000 --hostname=127.0.0.1" --name foundry
@@ -68,6 +68,7 @@ curl -fsSL "$REPO_RAW/caddy/Caddyfile" -o /tmp/Caddyfile
 
 # Replace placeholder with your domain (keep a clear token in the file, e.g. YOUR_DOMAIN)
 sudo sed "s/YOUR_DOMAIN/${DOMAIN}/g" /tmp/Caddyfile | sudo tee /etc/caddy/Caddyfile >/dev/null
+sudo systemctl enable --now caddy
 
 # Validate & reload Caddy
 sudo caddy validate --config /etc/caddy/Caddyfile
